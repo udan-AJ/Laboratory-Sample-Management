@@ -68,26 +68,46 @@
     const db = getFirestore(app);
 
     // Save Data
+    // Save Data segment eka mehema wenas karanna
     window.saveSample = async () => {
         const q = query(collection(db, "samples"), orderBy("sampleID", "desc"), limit(1));
         const snap = await getDocs(q);
+        
         let nextNum = 1;
-        snap.forEach(doc => {
-            nextNum = parseInt(doc.data().sampleID.split('-')[1]) + 1;
-        });
-        const sampleID = `{nextNum.toString().padStart(5, '0')}`;
+        
+        if (!snap.empty) {
+            snap.forEach(doc => {
+                const lastID = doc.data().sampleID;
+                nextNum = parseInt(lastID) + 1; // Dan thiyena ID eka number ekakata harawa 1k ekathu karanna
+            });
+        }
 
-        await addDoc(collection(db, "samples"), {
-            sampleID: sampleID,
-            dateReceived: document.getElementById('dateReceived').value,
-            dateSampling: document.getElementById('dateSampling').value,
-            ingredient: document.getElementById('feedIngredient').value,
-            moisture: document.getElementById('moisture').value,
-            inbound: document.getElementById('inboundNumber').value,
-            remarks: document.getElementById('remarks').value
-        });
-        alert("Saved! ID: " + sampleID);
-        loadData();
+        // 00001 format ekata hadaganna padStart(5, '0') use karanawa
+        const sampleID = nextNum.toString().padStart(6, '0'); 
+
+        try {
+            await addDoc(collection(db, "samples"), {
+                sampleID: sampleID,
+                dateReceived: document.getElementById('dateReceived').value,
+                dateSampling: document.getElementById('dateSampling').value,
+                ingredient: document.getElementById('feedIngredient').value,
+                moisture: document.getElementById('moisture').value,
+                inbound: document.getElementById('inboundNumber').value,
+                remarks: document.getElementById('remarks').value,
+                timestamp: new Date() // Sorting walata pahasu wenna timestamp ekak danna
+            });
+            alert("Saved! ID: " + sampleID);
+            
+            // Form eka reset karanna
+            document.getElementById('feedIngredient').value = "";
+            document.getElementById('moisture').value = "";
+            document.getElementById('inboundNumber').value = "";
+            document.getElementById('remarks').value = "";
+            
+            loadData();
+        } catch (e) {
+            console.error("Error adding document: ", e);
+        }
     };
 
     // Load Data
