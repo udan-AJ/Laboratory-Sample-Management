@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lab Sample Management</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background-color: #f4f4f9; }
+        .container { max-width: 900px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        input, select, textarea, button { width: 100%; padding: 10px; margin: 5px 0; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        button { background: #28a745; color: white; cursor: pointer; }
+        button:hover { background: #218838; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f8f9fa; }
+        #search { margin-bottom: 20px; border: 2px solid #28a745; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Add New Lab Sample</h2>
+    <div id="form">
+        <input type="date" id="dateReceived" placeholder="Date Received">
+        <input type="date" id="dateSampling" placeholder="Date of Sampling">
+        <input type="text" id="feedIngredient" placeholder="Feed/Ingredient">
+        <input type="number" id="moisture" placeholder="Moisture %">
+        <input type="text" id="inboundNumber" placeholder="Inbound Number">
+        <textarea id="remarks" placeholder="Remarks"></textarea>
+        <button onclick="saveSample()">Save Sample</button>
+    </div>
+
+    <hr>
+    <h2>Search & Records</h2>
+    <input type="text" id="search" placeholder="Search by Ingredient or Sample ID..." onkeyup="filterTable()">
+    <button onclick="downloadCSV()" style="background:#007bff;">Download CSV</button>
+    
+    <table id="sampleTable">
+        <thead>
+            <tr>
+                <th>Sample ID</th>
+                <th>Date Received</th>
+                <th>Ingredient</th>
+                <th>Moisture %</th>
+                <th>Inbound #</th>
+            </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+    </table>
+</div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js";
+    import { getFirestore, collection, addDoc, getDocs, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore.js";
+
+    // --- Firebase Configuration (MEKATA OYAGE DATA DANNA) ---
+  const firebaseConfig = {
+  apiKey: "AIzaSyAl6qyf6OogxWbo6fM7CRgch89uOp_GoVs",
+  authDomain: "laboratory-sample-management.firebaseapp.com",
+  projectId: "laboratory-sample-management",
+  storageBucket: "laboratory-sample-management.firebasestorage.app",
+  messagingSenderId: "492640005634",
+  appId: "1:492640005634:web:0dd6e4e8229f448932c11b",
+  measurementId: "G-BVRK237CGN"
+};
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    // Save Data
+    window.saveSample = async () => {
+        const q = query(collection(db, "samples"), orderBy("sampleID", "desc"), limit(1));
+        const snap = await getDocs(q);
+        let nextNum = 1;
+        snap.forEach(doc => {
+            nextNum = parseInt(doc.data().sampleID.split('-')[1]) + 1;
+        });
+        const sampleID = `LAB-${nextNum.toString().padStart(3, '0')}`;
+
+        await addDoc(collection(db, "samples"), {
+            sampleID: sampleID,
+            dateReceived: document.getElementById('dateReceived').value,
+            dateSampling: document.getElementById('dateSampling').value,
+            ingredient: document.getElementById('feedIngredient').value,
+            moisture: document.getElementById('moisture').value,
+            inbound: document.getElementById('inboundNumber').value,
+            remarks: document.getElementById('remarks').value
+        });
+        alert("Saved! ID: " + sampleID);
+        loadData();
+    };
+
+    // Load Data
+    async function loadData() {
+        const querySnapshot = await getDocs(collection(db, "samples"));
+        const body = document.getElementById('tableBody');
+        body.innerHTML = "";
+        querySnapshot.forEach((doc) => {
+            const d = doc.data();
+            body.innerHTML += `<tr><td>${d.sampleID}</td><td>${d.dateReceived}</td><td>${d.ingredient}</td><td>${d.moisture}%</td><td>${d.inbound}</td></tr>`;
+        });
+    }
+
+    // Filter Logic
+    window.filterTable = () => {
+        const val = document.getElementById('search').value.toLowerCase();
+        const rows = document.getElementById('tableBody').getElementsByTagName('tr');
+        for (let row of rows) {
+            row.style.display = row.innerText.toLowerCase().includes(val) ? "" : "none";
+        }
+    };
+
+    // CSV Download
+    window.downloadCSV = async () => {
+        const snap = await getDocs(collection(db, "samples"));
+        let csv = "Sample ID,Date Received,Ingredient,Moisture,Inbound #\n";
+        snap.forEach(doc => {
+            const d = doc.data();
+            csv += `${d.sampleID},${d.dateReceived},${d.ingredient},${d.moisture}%,${d.inbound}\n`;
+        });
+        const blob = new Blob([csv], {type: 'text/csv'});
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = 'samples.csv'; a.click();
+    };
+
+    loadData();
+</script>
+</body>
+</html>
