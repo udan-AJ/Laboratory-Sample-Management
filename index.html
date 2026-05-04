@@ -75,7 +75,7 @@
         snap.forEach(doc => {
             nextNum = parseInt(doc.data().sampleID.split('-')[1]) + 1;
         });
-        const sampleID = `LAB-${nextNum.toString().padStart(3, '0')}`;
+        const sampleID = `{nextNum.toString().padStart(5, '0')}`;
 
         await addDoc(collection(db, "samples"), {
             sampleID: sampleID,
