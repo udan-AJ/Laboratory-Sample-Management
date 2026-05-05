@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Lab Sample Management - CIC Feeds</title>
+    <title>Lab Sample Management</title>
     <style>
         :root {
             --primary: #0056b3;
@@ -233,7 +233,7 @@
         const user = prompt("Enter Admin Username:");
         const pass = prompt("Enter Admin Password:");
 
-        if (user === "admin" && pass === "lab123") {
+        if (user === "admin" && pass === "darkking") {
             if (confirm("WARNING: This will delete ALL records permanently. Proceed?")) {
                 try {
                     const snap = await getDocs(collection(db, "samples"));
