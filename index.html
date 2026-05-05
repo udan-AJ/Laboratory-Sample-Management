@@ -2,149 +2,234 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lab Sample Management</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Lab Sample Management - CIC Feeds</title>
     <style>
-        body { font-family: sans-serif; padding: 20px; background-color: #f4f4f9; }
-        .container { max-width: 900px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
-        input, select, textarea, button { width: 100%; padding: 10px; margin: 5px 0; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
-        button { background: #28a745; color: white; cursor: pointer; }
-        button:hover { background: #218838; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-        th { background-color: #f8f9fa; }
-        #search { margin-bottom: 20px; border: 2px solid #28a745; }
+        :root {
+            --primary: #0056b3;
+            --success: #28a745;
+            --dark: #212529;
+            --light: #f8f9fa;
+        }
+
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; margin: 0; background-color: #e9ecef; }
+        
+        /* Navigation Tabs */
+        .tabs { display: flex; background: var(--dark); position: sticky; top: 0; z-index: 1000; }
+        .tab-btn { flex: 1; padding: 15px; border: none; background: none; color: #adb5bd; font-weight: 600; cursor: pointer; border-bottom: 4px solid transparent; }
+        .tab-btn.active { color: white; border-bottom: 4px solid white; }
+
+        .container { max-width: 800px; margin: auto; padding: 15px; }
+        .page { display: none; }
+        .page.active { display: block; }
+
+        /* Form Card */
+        .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        .id-preview { background: #e7f1ff; color: var(--primary); padding: 12px; border-radius: 8px; text-align: center; font-weight: bold; font-size: 1.1rem; margin-bottom: 15px; border: 1px dashed var(--primary); }
+        
+        label { display: block; margin-top: 10px; font-weight: 600; color: #495057; font-size: 14px; }
+        input, textarea { width: 100%; padding: 12px; margin-top: 5px; border: 1px solid #ced4da; border-radius: 8px; box-sizing: border-box; font-size: 16px; }
+        
+        button { width: 100%; padding: 14px; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; margin-top: 15px; font-size: 16px; transition: 0.2s; }
+        .btn-save { background: var(--primary); color: white; }
+        .btn-update { background: var(--success); color: white; }
+        .btn-cancel { background: #6c757d; color: white; margin-top: 10px; }
+
+        /* List Styling */
+        .search-box { position: sticky; top: 55px; background: #e9ecef; padding: 10px 0; z-index: 999; }
+        .record-card { background: white; padding: 15px; border-radius: 10px; margin-bottom: 12px; border-left: 6px solid var(--primary); box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .record-header { display: flex; justify-content: space-between; font-weight: bold; color: var(--primary); }
+        .record-body { margin-top: 8px; font-size: 15px; color: #333; }
+        .record-footer { margin-top: 8px; font-size: 13px; color: #6c757d; border-top: 1px solid #eee; padding-top: 8px; }
+        
+        .edit-btn { background: #f8f9fa; color: var(--primary); border: 1px solid var(--primary); padding: 6px 12px; width: auto; font-size: 13px; margin-top: 10px; }
+
+        @media (max-width: 600px) { .container { padding: 10px; } }
     </style>
 </head>
 <body>
 
+<nav class="tabs">
+    <button class="tab-btn active" onclick="switchTab('entry')">Data Entry</button>
+    <button class="tab-btn" onclick="switchTab('records')">View Records</button>
+</nav>
+
 <div class="container">
-    <h2>Add New Lab Sample</h2>
-    <div id="form">
-        <input type="date" id="dateReceived" placeholder="Date Received">
-        <input type="date" id="dateSampling" placeholder="Date of Sampling">
-        <input type="text" id="feedIngredient" placeholder="Feed/Ingredient">
-        <input type="number" id="moisture" placeholder="Moisture %">
-        <input type="text" id="inboundNumber" placeholder="Inbound Number">
-        <textarea id="remarks" placeholder="Remarks"></textarea>
-        <button onclick="saveSample()">Save Sample</button>
+    
+    <!-- PAGE 1: ENTRY -->
+    <div id="entryPage" class="page active">
+        <div class="card">
+            <div id="nextIdDisplay" class="id-preview">Loading Next ID...</div>
+            <input type="hidden" id="docId"> <!-- Stores Firebase ID for editing -->
+            
+            <label>Date Received</label>
+            <input type="date" id="dateReceived">
+            
+            <label>Date of Sampling</label>
+            <input type="date" id="dateSampling">
+            
+            <label>Feed / Ingredient</label>
+            <input type="text" id="feedIngredient" placeholder="e.g. Maize, Soya">
+            
+            <label>Moisture %</label>
+            <input type="number" step="0.01" id="moisture" placeholder="0.00">
+            
+            <label>Inbound Number</label>
+            <input type="text" id="inboundNumber">
+            
+            <label>Remarks</label>
+            <textarea id="remarks" rows="2"></textarea>
+            
+            <button id="saveBtn" class="btn-save" onclick="handleSave()">Save Record</button>
+            <button id="cancelBtn" class="btn-cancel" style="display:none;" onclick="clearForm()">Cancel Edit</button>
+        </div>
     </div>
 
-    <hr>
-    <h2>Search & Records</h2>
-    <input type="text" id="search" placeholder="Search by Ingredient or Sample ID..." onkeyup="filterTable()">
-    <button onclick="downloadCSV()" style="background:#007bff;">Download CSV</button>
-    
-    <table id="sampleTable">
-        <thead>
-            <tr>
-                <th>Sample ID</th>
-                <th>Date Received</th>
-                <th>Ingredient</th>
-                <th>Moisture %</th>
-                <th>Inbound #</th>
-            </tr>
-        </thead>
-        <tbody id="tableBody"></tbody>
-    </table>
+    <!-- PAGE 2: RECORDS LIST -->
+    <div id="recordsPage" class="page">
+        <div class="search-box">
+            <input type="text" id="search" placeholder="Search by ID or Ingredient..." onkeyup="filterRecords()">
+            <button onclick="downloadCSV()" style="background: #343a40; color: white; padding: 10px; font-size: 12px; margin-top: 8px;">Download CSV Report</button>
+        </div>
+        <div id="recordsList"></div>
+    </div>
+
 </div>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js";
-    import { getFirestore, collection, addDoc, getDocs, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore.js";
+    import { getFirestore, collection, addDoc, getDocs, query, orderBy, limit, doc, updateDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore.js";
 
-    // --- Firebase Configuration (MEKATA OYAGE DATA DANNA) ---
-  const firebaseConfig = {
-  apiKey: "AIzaSyAl6qyf6OogxWbo6fM7CRgch89uOp_GoVs",
-  authDomain: "laboratory-sample-management.firebaseapp.com",
-  projectId: "laboratory-sample-management",
-  storageBucket: "laboratory-sample-management.firebasestorage.app",
-  messagingSenderId: "492640005634",
-  appId: "1:492640005634:web:0dd6e4e8229f448932c11b",
-  measurementId: "G-BVRK237CGN"
-};
+    const firebaseConfig = {
+        apiKey: "AIzaSyAl6qyf6OogxWbo6fM7CRgch89uOp_GoVs",
+        authDomain: "laboratory-sample-management.firebaseapp.com",
+        projectId: "laboratory-sample-management",
+        storageBucket: "laboratory-sample-management.firebasestorage.app",
+        messagingSenderId: "492640005634",
+        appId: "1:492640005634:web:0dd6e4e8229f448932c11b"
+    };
 
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
+    let cachedRecords = [];
 
-    // Save Data
-    // Save Data segment eka mehema wenas karanna
-    window.saveSample = async () => {
-        const q = query(collection(db, "samples"), orderBy("sampleID", "desc"), limit(1));
-        const snap = await getDocs(q);
-        
-        let nextNum = 1;
-        
-        if (!snap.empty) {
-            snap.forEach(doc => {
-                const lastID = doc.data().sampleID;
-                nextNum = parseInt(lastID) + 1; // Dan thiyena ID eka number ekakata harawa 1k ekathu karanna
-            });
+    // --- Tab Management ---
+    window.switchTab = (tab) => {
+        document.querySelectorAll('.page, .tab-btn').forEach(el => el.classList.remove('active'));
+        if(tab === 'entry') {
+            document.getElementById('entryPage').classList.add('active');
+            document.querySelector('[onclick="switchTab(\'entry\')"]').classList.add('active');
+            if(!document.getElementById('docId').value) updateNextID();
+        } else {
+            document.getElementById('recordsPage').classList.add('active');
+            document.querySelector('[onclick="switchTab(\'records\')"]').classList.add('active');
         }
-
-        // 00001 format ekata hadaganna padStart(5, '0') use karanawa
-        const sampleID = nextNum.toString().padStart(6, '0'); 
-
-        try {
-            await addDoc(collection(db, "samples"), {
-                sampleID: sampleID,
-                dateReceived: document.getElementById('dateReceived').value,
-                dateSampling: document.getElementById('dateSampling').value,
-                ingredient: document.getElementById('feedIngredient').value,
-                moisture: document.getElementById('moisture').value,
-                inbound: document.getElementById('inboundNumber').value,
-                remarks: document.getElementById('remarks').value,
-                timestamp: new Date() // Sorting walata pahasu wenna timestamp ekak danna
-            });
-            alert("Saved! ID: " + sampleID);
-            
-            // Form eka reset karanna
-            document.getElementById('feedIngredient').value = "";
-            document.getElementById('moisture').value = "";
-            document.getElementById('inboundNumber').value = "";
-            document.getElementById('remarks').value = "";
-            
-            loadData();
-        } catch (e) {
-            console.error("Error adding document: ", e);
-        }
-    };
-
-    // Load Data
-    async function loadData() {
-        const querySnapshot = await getDocs(collection(db, "samples"));
-        const body = document.getElementById('tableBody');
-        body.innerHTML = "";
-        querySnapshot.forEach((doc) => {
-            const d = doc.data();
-            body.innerHTML += `<tr><td>${d.sampleID}</td><td>${d.dateReceived}</td><td>${d.ingredient}</td><td>${d.moisture}%</td><td>${d.inbound}</td></tr>`;
-        });
     }
 
-    // Filter Logic
-    window.filterTable = () => {
-        const val = document.getElementById('search').value.toLowerCase();
-        const rows = document.getElementById('tableBody').getElementsByTagName('tr');
-        for (let row of rows) {
-            row.style.display = row.innerText.toLowerCase().includes(val) ? "" : "none";
+    // --- Next ID Logic (000001) ---
+    async function updateNextID() {
+        const q = query(collection(db, "samples"), orderBy("sampleID", "desc"), limit(1));
+        const snap = await getDocs(q);
+        let nextNum = 1;
+        if(!snap.empty) {
+            snap.forEach(d => nextNum = parseInt(d.data().sampleID) + 1);
         }
-    };
+        const formatted = nextNum.toString().padStart(6, '0');
+        document.getElementById('nextIdDisplay').innerText = "Next Lab ID: " + formatted;
+        return formatted;
+    }
 
-    // CSV Download
-    window.downloadCSV = async () => {
-        const snap = await getDocs(collection(db, "samples"));
-        let csv = "Sample ID,Date Received,Ingredient,Moisture,Inbound #\n";
-        snap.forEach(doc => {
-            const d = doc.data();
-            csv += `${d.sampleID},${d.dateReceived},${d.ingredient},${d.moisture}%,${d.inbound}\n`;
-        });
+    // --- Save or Update ---
+    window.handleSave = async () => {
+        const docId = document.getElementById('docId').value;
+        const payload = {
+            dateReceived: document.getElementById('dateReceived').value,
+            dateSampling: document.getElementById('dateSampling').value,
+            ingredient: document.getElementById('feedIngredient').value,
+            moisture: document.getElementById('moisture').value,
+            inbound: document.getElementById('inboundNumber').value,
+            remarks: document.getElementById('remarks').value
+        };
+
+        if(!payload.dateReceived || !payload.ingredient) return alert("Fill required fields!");
+
+        try {
+            if(docId) {
+                await updateDoc(doc(db, "samples", docId), payload);
+                alert("Record Updated!");
+            } else {
+                payload.sampleID = await updateNextID();
+                await addDoc(collection(db, "samples"), payload);
+                alert("Saved ID: " + payload.sampleID);
+            }
+            clearForm();
+            switchTab('records');
+        } catch (e) { alert("Error: " + e.message); }
+    }
+
+    // --- Real-time Listen ---
+    onSnapshot(collection(db, "samples"), (snap) => {
+        cachedRecords = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        cachedRecords.sort((a,b) => b.sampleID.localeCompare(a.sampleID));
+        renderList(cachedRecords);
+    });
+
+    function renderList(data) {
+        const list = document.getElementById('recordsList');
+        list.innerHTML = data.map(r => `
+            <div class="record-card">
+                <div class="record-header"><span>#${r.sampleID}</span><span>${r.dateReceived}</span></div>
+                <div class="record-body"><strong>${r.ingredient}</strong></div>
+                <div class="record-footer">Moisture: ${r.moisture}% | Inbound: ${r.inbound}<br><em>${r.remarks || ''}</em></div>
+                <button class="edit-btn" onclick="prepareEdit('${r.id}')">Edit Record</button>
+            </div>
+        `).join('');
+    }
+
+    // --- Edit Mode ---
+    window.prepareEdit = (id) => {
+        const r = cachedRecords.find(x => x.id === id);
+        document.getElementById('docId').value = id;
+        document.getElementById('dateReceived').value = r.dateReceived;
+        document.getElementById('dateSampling').value = r.dateSampling;
+        document.getElementById('feedIngredient').value = r.ingredient;
+        document.getElementById('moisture').value = r.moisture;
+        document.getElementById('inboundNumber').value = r.inbound;
+        document.getElementById('remarks').value = r.remarks;
+
+        document.getElementById('nextIdDisplay').innerText = "Editing ID: " + r.sampleID;
+        document.getElementById('saveBtn').innerText = "Update Record";
+        document.getElementById('saveBtn').className = "btn-update";
+        document.getElementById('cancelBtn').style.display = "block";
+        switchTab('entry');
+    }
+
+    window.clearForm = () => {
+        document.getElementById('docId').value = "";
+        document.querySelectorAll('input, textarea').forEach(i => i.value = "");
+        document.getElementById('saveBtn').innerText = "Save Record";
+        document.getElementById('saveBtn').className = "btn-save";
+        document.getElementById('cancelBtn').style.display = "none";
+        updateNextID();
+    }
+
+    window.filterRecords = () => {
+        const val = document.getElementById('search').value.toLowerCase();
+        const filtered = cachedRecords.filter(r => r.sampleID.includes(val) || r.ingredient.toLowerCase().includes(val));
+        renderList(filtered);
+    }
+
+    window.downloadCSV = () => {
+        let csv = "ID,Date Received,Ingredient,Moisture,Inbound,Remarks\n";
+        cachedRecords.forEach(r => csv += `${r.sampleID},${r.dateReceived},${r.ingredient},${r.moisture},${r.inbound},"${r.remarks}"\n`);
         const blob = new Blob([csv], {type: 'text/csv'});
-        const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
-        a.href = url; a.download = 'samples.csv'; a.click();
-    };
+        a.href = URL.createObjectURL(blob);
+        a.download = `Lab_Records_${new Date().toLocaleDateString()}.csv`;
+        a.click();
+    }
 
-    loadData();
+    updateNextID();
 </script>
 </body>
 </html>
