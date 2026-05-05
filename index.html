@@ -8,6 +8,7 @@
         :root {
             --primary: #0056b3;
             --success: #28a745;
+            --danger: #dc3545;
             --dark: #212529;
             --light: #f8f9fa;
         }
@@ -34,6 +35,7 @@
         .btn-save { background: var(--primary); color: white; }
         .btn-update { background: var(--success); color: white; }
         .btn-cancel { background: #6c757d; color: white; margin-top: 10px; }
+        .btn-reset { background: var(--danger); color: white; padding: 10px; font-size: 12px; margin-top: 8px; }
 
         /* List Styling */
         .search-box { position: sticky; top: 55px; background: #e9ecef; padding: 10px 0; z-index: 999; }
@@ -60,7 +62,7 @@
     <div id="entryPage" class="page active">
         <div class="card">
             <div id="nextIdDisplay" class="id-preview">Loading Next ID...</div>
-            <input type="hidden" id="docId"> <!-- Stores Firebase ID for editing -->
+            <input type="hidden" id="docId"> <!-- Firebase Doc ID -->
             
             <label>Date Received</label>
             <input type="date" id="dateReceived">
@@ -89,7 +91,10 @@
     <div id="recordsPage" class="page">
         <div class="search-box">
             <input type="text" id="search" placeholder="Search by ID or Ingredient..." onkeyup="filterRecords()">
-            <button onclick="downloadCSV()" style="background: #343a40; color: white; padding: 10px; font-size: 12px; margin-top: 8px;">Download CSV Report</button>
+            <div style="display: flex; gap: 10px;">
+                <button onclick="downloadCSV()" style="background: #343a40; color: white; padding: 10px; font-size: 12px; margin-top: 8px;">Download CSV</button>
+                <button onclick="confirmReset()" class="btn-reset">Reset All Data</button>
+            </div>
         </div>
         <div id="recordsList"></div>
     </div>
@@ -98,7 +103,7 @@
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js";
-    import { getFirestore, collection, addDoc, getDocs, query, orderBy, limit, doc, updateDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore.js";
+    import { getFirestore, collection, addDoc, getDocs, query, orderBy, limit, doc, updateDoc, onSnapshot, deleteDoc } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore.js";
 
     const firebaseConfig = {
         apiKey: "AIzaSyAl6qyf6OogxWbo6fM7CRgch89uOp_GoVs",
@@ -126,14 +131,21 @@
         }
     }
 
-    // --- Next ID Logic (000001) ---
+    // --- Next ID Logic (NaN Fix included) ---
     async function updateNextID() {
         const q = query(collection(db, "samples"), orderBy("sampleID", "desc"), limit(1));
         const snap = await getDocs(q);
         let nextNum = 1;
-        if(!snap.empty) {
-            snap.forEach(d => nextNum = parseInt(d.data().sampleID) + 1);
+
+        if (!snap.empty) {
+            snap.forEach(d => {
+                const lastID = d.data().sampleID;
+                const numericPart = lastID.replace(/[^0-9]/g, ''); 
+                const parsed = parseInt(numericPart);
+                if (!isNaN(parsed)) nextNum = parsed + 1;
+            });
         }
+        
         const formatted = nextNum.toString().padStart(6, '0');
         document.getElementById('nextIdDisplay').innerText = "Next Lab ID: " + formatted;
         return formatted;
@@ -156,11 +168,11 @@
         try {
             if(docId) {
                 await updateDoc(doc(db, "samples", docId), payload);
-                alert("Record Updated!");
+                alert("Record Updated Successfully!");
             } else {
                 payload.sampleID = await updateNextID();
                 await addDoc(collection(db, "samples"), payload);
-                alert("Saved ID: " + payload.sampleID);
+                alert("Saved New ID: " + payload.sampleID);
             }
             clearForm();
             switchTab('records');
@@ -206,11 +218,34 @@
 
     window.clearForm = () => {
         document.getElementById('docId').value = "";
-        document.querySelectorAll('input, textarea').forEach(i => i.value = "");
+        // Manually clear inputs to avoid clearing hidden ID
+        ['dateReceived', 'dateSampling', 'feedIngredient', 'moisture', 'inboundNumber', 'remarks'].forEach(id => {
+            document.getElementById(id).value = "";
+        });
         document.getElementById('saveBtn').innerText = "Save Record";
         document.getElementById('saveBtn').className = "btn-save";
         document.getElementById('cancelBtn').style.display = "none";
         updateNextID();
+    }
+
+    // --- Reset All Data (With Password) ---
+    window.confirmReset = async () => {
+        const user = prompt("Enter Admin Username:");
+        const pass = prompt("Enter Admin Password:");
+
+        if (user === "admin" && pass === "lab123") {
+            if (confirm("WARNING: This will delete ALL records permanently. Proceed?")) {
+                try {
+                    const snap = await getDocs(collection(db, "samples"));
+                    const deletePromises = snap.docs.map(d => deleteDoc(doc(db, "samples", d.id)));
+                    await Promise.all(deletePromises);
+                    alert("Database Reset Successful!");
+                    updateNextID();
+                } catch (e) { alert("Error: " + e.message); }
+            }
+        } else {
+            alert("Unauthorized Access!");
+        }
     }
 
     window.filterRecords = () => {
@@ -225,7 +260,7 @@
         const blob = new Blob([csv], {type: 'text/csv'});
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
-        a.download = `Lab_Records_${new Date().toLocaleDateString()}.csv`;
+        a.download = `Lab_Report_${new Date().toLocaleDateString()}.csv`;
         a.click();
     }
 
