@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Lab Sample Management - CIC Feeds</title>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
     <style>
         :root {
             --primary: #0056b3;
@@ -44,7 +47,27 @@
         .record-body { margin-top: 8px; font-size: 15px; color: #333; }
         .record-footer { margin-top: 8px; font-size: 13px; color: #6c757d; border-top: 1px solid #eee; padding-top: 8px; }
         
-        .edit-btn { background: #f8f9fa; color: var(--primary); border: 1px solid var(--primary); padding: 6px 12px; width: auto; font-size: 13px; margin-top: 10px; }
+        .btn-group { display: flex; gap: 10px; margin-top: 10px; }
+        .edit-btn { background: #f8f9fa; color: var(--primary); border: 1px solid var(--primary); padding: 6px 12px; width: auto; font-size: 13px; }
+        .print-btn { background: #f8f9fa; color: var(--success); border: 1px solid var(--success); padding: 6px 12px; width: auto; font-size: 13px; }
+
+        /* PRINT STYLES */
+        #labelContainer { display: none; }
+
+        @media print {
+            body * { visibility: hidden; }
+            #labelContainer, #labelContainer * { visibility: visible; }
+            #labelContainer { 
+                display: block; 
+                position: absolute; 
+                left: 0; top: 0; 
+                width: 80mm; 
+                padding: 10px;
+                border: 1px solid #000;
+            }
+            .label-box { text-align: center; font-family: 'Segoe UI', sans-serif; }
+            #qrcode { display: flex; justify-content: center; margin: 10px 0; }
+        }
 
         @media (max-width: 600px) { .container { padding: 10px; } }
     </style>
@@ -57,12 +80,10 @@
 </nav>
 
 <div class="container">
-    
-    <!-- PAGE 1: ENTRY -->
     <div id="entryPage" class="page active">
         <div class="card">
             <div id="nextIdDisplay" class="id-preview">Loading Next ID...</div>
-            <input type="hidden" id="docId"> <!-- Firebase Doc ID -->
+            <input type="hidden" id="docId">
             
             <label>Date Received</label>
             <input type="date" id="dateReceived">
@@ -87,7 +108,6 @@
         </div>
     </div>
 
-    <!-- PAGE 2: RECORDS LIST -->
     <div id="recordsPage" class="page">
         <div class="search-box">
             <input type="text" id="search" placeholder="Search by ID or Ingredient..." onkeyup="filterRecords()">
@@ -98,7 +118,14 @@
         </div>
         <div id="recordsList"></div>
     </div>
+</div>
 
+<div id="labelContainer">
+    <div class="label-box">
+        <h3 style="margin:0; font-size: 16px;">CIC FEEDS - LAB SAMPLE</h3>
+        <div id="qrcode"></div>
+        <div id="labelDetails" style="font-size: 13px; text-align: left; margin-top: 5px; line-height: 1.4;"></div>
+    </div>
 </div>
 
 <script type="module">
@@ -118,7 +145,6 @@
     const db = getFirestore(app);
     let cachedRecords = [];
 
-    // --- Tab Management ---
     window.switchTab = (tab) => {
         document.querySelectorAll('.page, .tab-btn').forEach(el => el.classList.remove('active'));
         if(tab === 'entry') {
@@ -131,12 +157,10 @@
         }
     }
 
-    // --- Next ID Logic (NaN Fix included) ---
     async function updateNextID() {
         const q = query(collection(db, "samples"), orderBy("sampleID", "desc"), limit(1));
         const snap = await getDocs(q);
         let nextNum = 1;
-
         if (!snap.empty) {
             snap.forEach(d => {
                 const lastID = d.data().sampleID;
@@ -145,13 +169,11 @@
                 if (!isNaN(parsed)) nextNum = parsed + 1;
             });
         }
-        
         const formatted = nextNum.toString().padStart(6, '0');
         document.getElementById('nextIdDisplay').innerText = "Next Lab ID: " + formatted;
         return formatted;
     }
 
-    // --- Save or Update ---
     window.handleSave = async () => {
         const docId = document.getElementById('docId').value;
         const payload = {
@@ -168,18 +190,17 @@
         try {
             if(docId) {
                 await updateDoc(doc(db, "samples", docId), payload);
-                alert("Record Updated Successfully!");
+                alert("Record Updated!");
             } else {
                 payload.sampleID = await updateNextID();
                 await addDoc(collection(db, "samples"), payload);
-                alert("Saved New ID: " + payload.sampleID);
+                alert("Saved ID: " + payload.sampleID);
             }
             clearForm();
             switchTab('records');
         } catch (e) { alert("Error: " + e.message); }
     }
 
-    // --- Real-time Listen ---
     onSnapshot(collection(db, "samples"), (snap) => {
         cachedRecords = snap.docs.map(d => ({ id: d.id, ...d.data() }));
         cachedRecords.sort((a,b) => b.sampleID.localeCompare(a.sampleID));
@@ -192,13 +213,37 @@
             <div class="record-card">
                 <div class="record-header"><span>#${r.sampleID}</span><span>${r.dateReceived}</span></div>
                 <div class="record-body"><strong>${r.ingredient}</strong></div>
-                <div class="record-footer">Moisture: ${r.moisture}% | Inbound: ${r.inbound}<br><em>${r.remarks || ''}</em></div>
-                <button class="edit-btn" onclick="prepareEdit('${r.id}')">Edit Record</button>
+                <div class="record-footer">Moisture: ${r.moisture}% | Inbound: ${r.inbound}</div>
+                <div class="btn-group">
+                    <button class="edit-btn" onclick="prepareEdit('${r.id}')">Edit</button>
+                    <button class="print-btn" onclick="printLabel('${r.id}')">Print Label</button>
+                </div>
             </div>
         `).join('');
     }
 
-    // --- Edit Mode ---
+    // PRINT LABEL LOGIC
+    window.printLabel = (id) => {
+        const r = cachedRecords.find(x => x.id === id);
+        if(!r) return;
+
+        document.getElementById("qrcode").innerHTML = "";
+        new QRCode(document.getElementById("qrcode"), {
+            text: `ID:${r.sampleID}\nITEM:${r.ingredient}\nDATE:${r.dateReceived}`,
+            width: 100,
+            height: 100
+        });
+
+        document.getElementById("labelDetails").innerHTML = `
+            <b>ID:</b> ${r.sampleID}<br>
+            <b>Ingredient:</b> ${r.ingredient}<br>
+            <b>Date:</b> ${r.dateReceived}<br>
+            <b>Inbound:</b> ${r.inbound}
+        `;
+
+        setTimeout(() => { window.print(); }, 500);
+    }
+
     window.prepareEdit = (id) => {
         const r = cachedRecords.find(x => x.id === id);
         document.getElementById('docId').value = id;
@@ -208,7 +253,6 @@
         document.getElementById('moisture').value = r.moisture;
         document.getElementById('inboundNumber').value = r.inbound;
         document.getElementById('remarks').value = r.remarks;
-
         document.getElementById('nextIdDisplay').innerText = "Editing ID: " + r.sampleID;
         document.getElementById('saveBtn').innerText = "Update Record";
         document.getElementById('saveBtn').className = "btn-update";
@@ -218,7 +262,6 @@
 
     window.clearForm = () => {
         document.getElementById('docId').value = "";
-        // Manually clear inputs to avoid clearing hidden ID
         ['dateReceived', 'dateSampling', 'feedIngredient', 'moisture', 'inboundNumber', 'remarks'].forEach(id => {
             document.getElementById(id).value = "";
         });
@@ -228,24 +271,17 @@
         updateNextID();
     }
 
-    // --- Reset All Data (With Password) ---
     window.confirmReset = async () => {
-        const user = prompt("Enter Admin Username:");
-        const pass = prompt("Enter Admin Password:");
-
+        const user = prompt("Admin User:");
+        const pass = prompt("Password:");
         if (user === "admin" && pass === "lab123") {
-            if (confirm("WARNING: This will delete ALL records permanently. Proceed?")) {
-                try {
-                    const snap = await getDocs(collection(db, "samples"));
-                    const deletePromises = snap.docs.map(d => deleteDoc(doc(db, "samples", d.id)));
-                    await Promise.all(deletePromises);
-                    alert("Database Reset Successful!");
-                    updateNextID();
-                } catch (e) { alert("Error: " + e.message); }
+            if (confirm("Delete ALL records?")) {
+                const snap = await getDocs(collection(db, "samples"));
+                const promises = snap.docs.map(d => deleteDoc(doc(db, "samples", d.id)));
+                await Promise.all(promises);
+                updateNextID();
             }
-        } else {
-            alert("Unauthorized Access!");
-        }
+        } else { alert("Wrong credentials!"); }
     }
 
     window.filterRecords = () => {
@@ -260,7 +296,7 @@
         const blob = new Blob([csv], {type: 'text/csv'});
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
-        a.download = `Lab_Report_${new Date().toLocaleDateString()}.csv`;
+        a.download = `Lab_Report.csv`;
         a.click();
     }
 
