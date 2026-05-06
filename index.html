@@ -16,6 +16,8 @@
         }
 
         body { font-family: 'Segoe UI', Tahoma, sans-serif; margin: 0; background-color: #e9ecef; }
+        
+        /* Navigation Tabs */
         .tabs { display: flex; background: var(--dark); position: sticky; top: 0; z-index: 1000; }
         .tab-btn { flex: 1; padding: 15px; border: none; background: none; color: #adb5bd; font-weight: 600; cursor: pointer; border-bottom: 4px solid transparent; }
         .tab-btn.active { color: white; border-bottom: 4px solid white; }
@@ -24,6 +26,7 @@
         .page { display: none; }
         .page.active { display: block; }
 
+        /* Form Card */
         .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); margin-bottom: 20px; }
         .id-preview { background: #e7f1ff; color: var(--primary); padding: 12px; border-radius: 8px; text-align: center; font-weight: bold; font-size: 1.1rem; margin-bottom: 15px; border: 1px dashed var(--primary); }
         
@@ -35,14 +38,19 @@
         .btn-update { background: var(--success); color: white; }
         .btn-cancel { background: #6c757d; color: white; margin-top: 10px; }
 
+        /* List Styling */
+        .search-box { position: sticky; top: 55px; background: #e9ecef; padding: 10px 0; z-index: 999; }
         .record-card { background: white; padding: 15px; border-radius: 10px; margin-bottom: 12px; border-left: 6px solid var(--primary); box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
         .record-header { display: flex; justify-content: space-between; font-weight: bold; color: var(--primary); }
+        
         .action-btns { display: flex; gap: 8px; margin-top: 10px; }
         .edit-btn { background: #f8f9fa; color: var(--primary); border: 1px solid var(--primary); padding: 8px; font-size: 13px; width: auto; flex: 1; }
         .print-btn { background: #343a40; color: white; padding: 8px; font-size: 13px; width: auto; flex: 1; }
 
-        /* Hidden QR Container for generation */
+        /* Hidden QR Generator */
         #qr-gen { display: none; }
+
+        @media (max-width: 600px) { .container { padding: 10px; } }
     </style>
 </head>
 <body>
@@ -53,38 +61,53 @@
 </nav>
 
 <div class="container">
+    
+    <!-- PAGE 1: ENTRY -->
     <div id="entryPage" class="page active">
         <div class="card">
-            <div id="nextIdDisplay" class="id-preview">Loading...</div>
+            <div id="nextIdDisplay" class="id-preview">Loading Next ID...</div>
             <input type="hidden" id="docId">
             
             <label>Date Received</label>
             <input type="date" id="dateReceived">
+            
             <label>Feed / Ingredient</label>
-            <input type="text" id="feedIngredient" placeholder="Maize, Soya, etc.">
+            <input type="text" id="feedIngredient" placeholder="e.g. Maize, Soya">
+
             <label>Supplier Name</label>
-            <input type="text" id="supplier" placeholder="Enter Supplier Name">
+            <input type="text" id="supplier" placeholder="Enter Supplier">
+
             <label>Lorry / Vehicle Number</label>
-            <input type="text" id="lorryNumber" placeholder="WP GA-1234">
+            <input type="text" id="lorryNumber" placeholder="GA-1234">
+            
             <label>Moisture %</label>
             <input type="number" step="0.01" id="moisture" placeholder="0.00">
+            
             <label>Inbound Number</label>
             <input type="text" id="inboundNumber">
+            
             <label>Remarks</label>
             <textarea id="remarks" rows="2"></textarea>
             
-            <button id="saveBtn" class="btn-save" onclick="handleSave()">Save & Preview</button>
+            <button id="saveBtn" class="btn-save" onclick="handleSave()">Save Record</button>
             <button id="cancelBtn" class="btn-cancel" style="display:none;" onclick="clearForm()">Cancel Edit</button>
         </div>
     </div>
 
+    <!-- PAGE 2: RECORDS LIST -->
     <div id="recordsPage" class="page">
-        <input type="text" id="search" placeholder="Search records..." onkeyup="filterRecords()" style="margin-bottom:10px;">
+        <div class="search-box">
+            <input type="text" id="search" placeholder="Search by ID or Ingredient..." onkeyup="filterRecords()">
+            <div style="display: flex; gap: 10px; margin-top: 8px;">
+                <button onclick="downloadCSV()" style="background: #343a40; color: white; padding: 10px; font-size: 12px; flex: 1;">Download CSV</button>
+                <button onclick="confirmReset()" style="background: var(--danger); color: white; padding: 10px; font-size: 12px; flex: 1;">Reset All</button>
+            </div>
+        </div>
         <div id="recordsList"></div>
     </div>
 </div>
 
-<!-- Hidden QR Code Gen Area -->
+<!-- Hidden QR Code Gen -->
 <div id="qr-gen"></div>
 
 <script type="module">
@@ -108,6 +131,7 @@
         document.querySelectorAll('.page, .tab-btn').forEach(el => el.classList.remove('active'));
         document.getElementById(tab + 'Page').classList.add('active');
         document.querySelector(`[onclick="switchTab('${tab}')"]`).classList.add('active');
+        if(tab === 'entry' && !document.getElementById('docId').value) updateNextID();
     }
 
     async function updateNextID() {
@@ -121,7 +145,7 @@
             });
         }
         const formatted = nextNum.toString().padStart(6, '0');
-        document.getElementById('nextIdDisplay').innerText = "Lab ID: " + formatted;
+        document.getElementById('nextIdDisplay').innerText = "Next Lab ID: " + formatted;
         return formatted;
     }
 
@@ -137,7 +161,7 @@
             remarks: document.getElementById('remarks').value
         };
 
-        if(!payload.dateReceived || !payload.ingredient) return alert("Required fields missing!");
+        if(!payload.dateReceived || !payload.ingredient) return alert("Fill required fields!");
 
         try {
             if(docId) {
@@ -146,7 +170,7 @@
             } else {
                 payload.sampleID = await updateNextID();
                 await addDoc(collection(db, "samples"), payload);
-                alert("Saved!");
+                alert("Saved ID: " + payload.sampleID);
             }
             clearForm();
             switchTab('records');
@@ -162,14 +186,51 @@
     function renderList(data) {
         document.getElementById('recordsList').innerHTML = data.map(r => `
             <div class="record-card">
-                <div class="record-header"><span>ID: ${r.sampleID}</span><span>${r.dateReceived}</span></div>
-                <div style="font-size:14px; margin-top:5px;"><strong>${r.ingredient}</strong> | ${r.supplier || 'N/A'}</div>
+                <div class="record-header"><span>#${r.sampleID}</span><span>${r.dateReceived}</span></div>
+                <div style="margin-top:5px;"><strong>${r.ingredient}</strong> | ${r.supplier || 'No Supplier'}</div>
                 <div class="action-btns">
                     <button class="edit-btn" onclick="prepareEdit('${r.id}')">Edit</button>
                     <button class="print-btn" onclick="printLabel('${r.id}')">Print Label</button>
                 </div>
             </div>
         `).join('');
+    }
+
+    window.printLabel = (id) => {
+        const r = cachedRecords.find(x => x.id === id);
+        const qrDiv = document.getElementById('qr-gen');
+        qrDiv.innerHTML = "";
+        new QRCode(qrDiv, { text: r.sampleID, width: 100, height: 100 });
+
+        setTimeout(() => {
+            const qrImg = qrDiv.querySelector('img').src;
+            const printWin = window.open('', '', 'width=400,height=600');
+            printWin.document.write(`
+                <html>
+                <head>
+                    <style>
+                        body { font-family: sans-serif; text-align: center; padding: 15px; border: 1px solid #000; margin: 10px; }
+                        .title { font-size: 14px; font-weight: bold; text-decoration: underline; }
+                        .lab-id { font-size: 22px; font-weight: bold; margin: 8px 0; }
+                        .qr { margin: 10px auto; }
+                        .data { text-align: left; font-size: 14px; margin: 4px 0; border-bottom: 1px dashed #ccc; padding-bottom: 2px; }
+                    </style>
+                </head>
+                <body>
+                    <div class="title">CIC FEEDS - LAB SAMPLE</div>
+                    <div class="lab-id">ID: ${r.sampleID}</div>
+                    <img src="${qrImg}" class="qr">
+                    <div class="data"><b>Date:</b> ${r.dateReceived}</div>
+                    <div class="data"><b>Ingredient:</b> ${r.ingredient}</div>
+                    <div class="data"><b>Supplier:</b> ${r.supplier || '-'}</div>
+                    <div class="data"><b>Lorry:</b> ${r.lorry || '-'}</div>
+                    <div class="data"><b>Inbound #:</b> ${r.inbound}</div>
+                    <script>window.onload = function() { window.print(); window.close(); }</script>
+                </body>
+                </html>
+            `);
+            printWin.document.close();
+        }, 500);
     }
 
     window.prepareEdit = (id) => {
@@ -187,48 +248,29 @@
         switchTab('entry');
     }
 
-    window.printLabel = (id) => {
-        const r = cachedRecords.find(x => x.id === id);
-        const qrDiv = document.getElementById('qr-gen');
-        qrDiv.innerHTML = "";
-        new QRCode(qrDiv, { text: r.sampleID, width: 100, height: 100 });
-
-        setTimeout(() => {
-            const qrImg = qrDiv.querySelector('img').src;
-            const printWin = window.open('', '', 'width=400,height=600');
-            printWin.document.write(`
-                <html>
-                <head>
-                    <style>
-                        body { font-family: sans-serif; text-align: center; padding: 20px; border: 2px solid black; }
-                        .lab-id { font-size: 24px; font-weight: bold; margin: 10px 0; }
-                        .detail { font-size: 16px; margin: 5px 0; text-align: left; border-bottom: 1px solid #eee; }
-                        .qr-code { margin: 15px auto; }
-                    </style>
-                </head>
-                <body>
-                    <div style="font-weight:bold; font-size:18px;">CIC FEEDS LAB SAMPLE</div>
-                    <div class="lab-id">ID: ${r.sampleID}</div>
-                    <img src="${qrImg}" class="qr-code">
-                    <div class="detail"><b>Date:</b> ${r.dateReceived}</div>
-                    <div class="detail"><b>Ingredient:</b> ${r.ingredient}</div>
-                    <div class="detail"><b>Supplier:</b> ${r.supplier || '-'}</div>
-                    <div class="detail"><b>Lorry:</b> ${r.lorry || '-'}</div>
-                    <div class="detail"><b>Inbound #:</b> ${r.inbound}</div>
-                    <script>window.onload = function() { window.print(); window.close(); }</script>
-                </body>
-                </html>
-            `);
-            printWin.document.close();
-        }, 500);
+    window.confirmReset = async () => {
+        const user = prompt("Admin User:");
+        const pass = prompt("Admin Password:");
+        if (user === "admin" && pass === "lab123") {
+            if (confirm("Delete all data?")) {
+                const snap = await getDocs(collection(db, "samples"));
+                await Promise.all(snap.docs.map(d => deleteDoc(doc(db, "samples", d.id))));
+                alert("Reset Done!");
+            }
+        } else { alert("Invalid!"); }
     }
 
     window.clearForm = () => {
         document.getElementById('docId').value = "";
-        ['dateReceived', 'feedIngredient', 'supplier', 'lorryNumber', 'moisture', 'inboundNumber', 'remarks'].forEach(id => document.getElementById(id).value = "");
-        document.getElementById('saveBtn').innerText = "Save & Preview";
+        ['dateReceived', 'feedIngredient', 'supplier', 'lorryNumber', 'moisture', 'inboundNumber', 'remarks'].forEach(i => document.getElementById(i).value = "");
+        document.getElementById('saveBtn').innerText = "Save Record";
         document.getElementById('cancelBtn').style.display = "none";
         updateNextID();
+    }
+
+    window.filterRecords = () => {
+        const v = document.getElementById('search').value.toLowerCase();
+        renderList(cachedRecords.filter(r => r.sampleID.includes(v) || r.ingredient.toLowerCase().includes(v)));
     }
 
     updateNextID();
